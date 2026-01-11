@@ -3,254 +3,486 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrethSearch - Cloud Index</title>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <title>TrethFlow - Fluid Knowledge Base</title>
+    <!-- Branding Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- Firebase SDKs (Compat version for widest browser support) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <style>
-        :root { --bg: #f8fafc; --text: #0f172a; --primary: #4f46e5; --success: #10b981; --error: #ef4444; --admin: #1e293b; }
-        body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); padding: 40px 20px; margin: 0; }
-        .container { max-width: 600px; margin: 0 auto; }
-        header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; }
-        
-        /* Status UI */
-        .status-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #cbd5e1; }
-        .online { background: var(--success); box-shadow: 0 0 8px var(--success); }
-        
-        /* Inputs */
-        input, textarea { width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #e2e8f0; font-size: 16px; outline: none; margin-bottom: 10px; }
-        input:focus { border-color: var(--primary); }
-        #searchBar { padding: 16px; font-size: 18px; margin-bottom: 20px; }
+        :root { 
+            --bg: #f8fafc; 
+            --text: #0f172a; 
+            --primary: #6366f1; 
+            --success: #10b981; 
+            --error: #ef4444; 
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --grid-color: rgba(15, 23, 42, 0.1); 
+            --muted: #64748b;
+            --radius: 24px;
+            --transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            --font-main: 'Inter', sans-serif;
+            --font-brand: 'Outfit', sans-serif;
+        }
 
-        /* Panels */
-        .panel { display: none; background: white; padding: 20px; border-radius: 16px; border: 1px solid #e2e8f0; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
-        .admin-panel { background: var(--admin); color: white; }
-        .admin-panel input, .admin-panel textarea { background: #334155; border-color: #475569; color: white; }
+        body.dark-theme {
+            --bg: #0f1115;
+            --text: #f1f5f9;
+            --surface: #1a1d23;
+            --border: #2d3139;
+            --grid-color: rgba(255, 255, 255, 0.15); 
+            --muted: #94a3b8;
+        }
         
-        /* Cards */
-        .result-card { background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-top: 15px; position: relative; }
-        .request-card { border-left: 4px solid #fbbf24; margin-bottom: 10px; background: #fffbeb; }
-        
-        /* Buttons */
-        .btn { padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-primary { background: var(--primary); color: white; width: 100%; }
-        .btn-approve { background: var(--success); color: white; margin-right: 5px; }
-        .btn-reject { background: var(--error); color: white; }
-        .tab-btn { background: #e2e8f0; font-size: 12px; margin-bottom: 10px; margin-right: 5px; }
-        .tab-active { background: var(--primary); color: white; }
+        body { 
+            font-family: var(--font-main); 
+            background: var(--bg); 
+            color: var(--text); 
+            padding: 80px 20px; 
+            margin: 0; 
+            line-height: 1.6;
+            transition: background 0.5s ease;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+        }
 
-        .badge { font-size: 11px; font-weight: bold; text-transform: uppercase; padding: 2px 8px; border-radius: 20px; background: #e0e7ff; color: #4338ca; }
+        /* Background Grid Animation */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: radial-gradient(var(--grid-color) 1.5px, transparent 1.5px);
+            background-size: 40px 40px;
+            z-index: -1;
+            pointer-events: none;
+            animation: gridBreath 8s ease-in-out infinite;
+        }
+
+        @keyframes gridBreath {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.01); }
+        }
+
+        .container { max-width: 800px; margin: 0 auto; position: relative; z-index: 1; }
+        
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 60px; 
+        }
+        
+        .logo { 
+            font-family: var(--font-brand);
+            font-size: 36px;
+            font-weight: 800; 
+            letter-spacing: -1.5px; 
+            margin: 0; 
+            cursor: pointer; 
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: baseline;
+        }
+        .logo:hover { transform: scale(1.05) rotate(-1deg); }
+        .logo .dot { 
+            display: inline-block;
+            width: 8px; 
+            height: 8px; 
+            background: var(--primary); 
+            margin-left: 3px;
+            border-radius: 1.5px;
+            transition: var(--transition);
+        }
+        
+        /* Status Pill Animation Logic */
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 20px;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--muted);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            cursor: default;
+            transition: var(--transition);
+            font-family: var(--font-brand);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            user-select: none;
+        }
+
+        .status-pill:hover { 
+            animation: snappyPing 1.5s cubic-bezier(0.45, 0, 0.55, 1) 1; 
+            color: var(--text);
+            border-color: var(--primary);
+            box-shadow: 0 8px 15px -3px rgba(0,0,0,0.1);
+        }
+
+        @keyframes snappyPing {
+            0%   { transform: rotate(0deg) scale(1); }
+            5%   { transform: rotate(-6deg) scale(1.05); }
+            15%  { transform: rotate(6deg) scale(1.05); }
+            25%  { transform: rotate(-4deg) scale(1.05); }
+            35%  { transform: rotate(4deg) scale(1.05); }
+            45%  { transform: rotate(-2deg) scale(1.05); }
+            55%  { transform: rotate(2deg) scale(1.05); }
+            70%  { transform: rotate(0deg) scale(1.05); }
+            100% { transform: rotate(0deg) scale(1); }
+        }
+
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transition: 0.3s; }
+        .online .status-dot { background: var(--success); box-shadow: 0 0 10px var(--success); }
+
+        .nav-container {
+            position: relative;
+            background: var(--border);
+            padding: 6px;
+            border-radius: 18px;
+            display: flex;
+            margin-bottom: 40px;
+            z-index: 1;
+        }
+        .nav-indicator {
+            position: absolute;
+            height: calc(100% - 12px);
+            background: var(--surface);
+            border-radius: 14px;
+            transition: transform 0.4s cubic-bezier(0.65, 0, 0.35, 1), width 0.4s cubic-bezier(0.65, 0, 0.35, 1);
+            z-index: -1;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            pointer-events: none;
+        }
+        .tab { 
+            flex: 1;
+            padding: 14px 0;
+            font-family: var(--font-brand);
+            font-size: 15px; 
+            font-weight: 700; 
+            cursor: pointer; 
+            border: none; 
+            background: transparent;
+            color: var(--muted);
+            transition: color 0.3s ease;
+            text-align: center;
+        }
+        .tab.active { color: var(--text); }
+
+        .search-wrapper { 
+            margin-bottom: 30px; 
+            perspective: 1000px;
+        }
+        
+        #searchBar { 
+            font-family: var(--font-main);
+            font-size: 20px; 
+            padding: 24px 30px; 
+            border-radius: 28px; 
+            border: 1px solid var(--border); 
+            background: var(--surface); 
+            box-shadow: 0 10px 40px rgba(0,0,0,0.04);
+            transition: var(--transition);
+            width: 100%;
+            outline: none;
+            color: var(--text);
+            box-sizing: border-box;
+            transform-origin: center;
+        }
+
+        #searchBar:hover, #searchBar:focus { 
+            transform: scale(1.02); 
+            border-color: var(--primary);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.1);
+        }
+
+        .card { 
+            background: var(--surface); 
+            padding: 30px; 
+            border-radius: var(--radius); 
+            border: 1px solid var(--border); 
+            margin-top: 16px; 
+            transition: var(--transition);
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+        }
+        .card:hover { 
+            transform: scale(1.01) translateY(-4px); 
+            border-color: var(--primary);
+            box-shadow: 0 15px 30px -10px rgba(0,0,0,0.1);
+        }
+        .card h3 { font-family: var(--font-brand); font-size: 22px; margin: 12px 0 8px; }
+        .card .badge { 
+            font-family: var(--font-brand);
+            font-size: 11px; 
+            font-weight: 800; 
+            text-transform: uppercase; 
+            color: var(--primary); 
+            background: rgba(99, 102, 241, 0.1); 
+            padding: 5px 12px; 
+            border-radius: 8px; 
+            letter-spacing: 0.8px;
+        }
+
+        #instantMatch {
+            margin-bottom: 32px;
+            padding: 40px;
+            background: var(--primary);
+            color: white;
+            border-radius: 32px;
+            display: none;
+            animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 20px 45px -5px rgba(99, 102, 241, 0.4);
+            font-family: var(--font-brand);
+        }
+
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 20px; }
+        @media (min-width: 600px) { .color-grid { grid-template-columns: repeat(6, 1fr); } }
+
+        .color-dot { 
+            aspect-ratio: 1; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            border: 4px solid transparent; 
+            transition: var(--transition); 
+        }
+        .color-dot.selected { border-color: var(--text); transform: scale(1.1); }
+
+        .view { display: none; }
+        .view.active { display: block; animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .btn { 
+            font-family: var(--font-brand);
+            padding: 18px 24px; 
+            border-radius: 18px; 
+            border: none; 
+            font-weight: 800; 
+            font-size: 16px;
+            cursor: pointer; 
+            transition: var(--transition);
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <div>
-                <h1 style="margin:0">TrethSearch<span style="color:var(--primary)">.</span></h1>
-                <p id="modeDesc" style="margin:0; color:#64748b; font-size:14px">Search the Index</p>
-            </div>
-            <div style="text-align:right">
-                <div id="dot" class="status-dot"></div>
-                <div id="statusTxt" style="font-size:12px; color:#64748b">Connecting...</div>
+            <h1 class="logo" id="mainLogo" onclick="switchMode('search', 0)">TrethFlow<div class="dot"></div></h1>
+            <div id="statusPill" class="status-pill">
+                <div class="status-dot"></div>
+                <span id="statusTxt">Offline</span>
             </div>
         </header>
 
-        <!-- Mode Toggles -->
-        <div style="margin-bottom: 15px;">
-            <button id="btnSearch" class="btn tab-btn tab-active" onclick="switchMode('search')">Search</button>
-            <button id="btnRequest" class="btn tab-btn" onclick="switchMode('request')">Request Add</button>
-            <button id="btnAdmin" class="btn tab-btn" style="display:none" onclick="switchMode('admin')">Admin Console</button>
+        <div class="nav-container">
+            <div id="navIndicator" class="nav-indicator"></div>
+            <button id="tab-search" class="tab active" onmouseenter="hoverTab(0)" onmouseleave="resetIndicator()" onclick="switchMode('search', 0)">Search</button>
+            <button id="tab-request" class="tab" onmouseenter="hoverTab(1)" onmouseleave="resetIndicator()" onclick="switchMode('request', 1)">Contribute</button>
+            <button id="tab-settings" class="tab" onmouseenter="hoverTab(2)" onmouseleave="resetIndicator()" onclick="switchMode('settings', 2)">Settings</button>
         </div>
 
-        <!-- Search Mode -->
-        <div id="viewSearch">
-            <input type="text" id="searchBar" placeholder="Search topics..." autocomplete="off">
+        <div id="view-search" class="view active">
+            <div class="search-wrapper">
+                <input type="text" id="searchBar" placeholder="What are you looking for?" autocomplete="off">
+            </div>
+            <div id="instantMatch">
+                <span id="matchCat" style="font-size:12px; text-transform:uppercase; letter-spacing:1.5px; opacity:0.85; font-weight:800;">Primary Match</span>
+                <h2 id="matchTitle" style="font-size:32px; margin: 12px 0; font-weight:800; letter-spacing:-1px;">Topic</h2>
+                <p id="matchVal" style="margin:0; opacity:0.95; font-size:18px; font-family:var(--font-main); line-height:1.5;"></p>
+            </div>
             <div id="resultsList"></div>
         </div>
 
-        <!-- Request Mode (Public) -->
-        <div id="viewRequest" class="panel">
-            <h3 style="margin-top:0">Suggest a Topic</h3>
-            <p style="font-size: 13px; color: #64748b;">Submit info to be reviewed by the admin.</p>
-            <input type="text" id="reqTitle" placeholder="Topic Title">
-            <input type="text" id="reqCat" placeholder="Category (e.g. Science)">
-            <textarea id="reqInfo" placeholder="Details..." rows="3"></textarea>
-            <button class="btn btn-primary" onclick="submitRequest()">Submit for Review</button>
-        </div>
-
-        <!-- Admin Mode -->
-        <div id="viewAdmin" class="panel admin-panel">
-            <h3 style="margin-top:0">Admin Dashboard</h3>
-            
-            <div style="border-bottom: 1px solid #475569; padding-bottom: 15px; margin-bottom: 15px;">
-                <h4 style="margin:0 0 10px 0">Direct Add</h4>
-                <input type="text" id="adminTitle" placeholder="Title">
-                <input type="text" id="adminCat" placeholder="Category">
-                <textarea id="adminInfo" placeholder="Details..." rows="2"></textarea>
-                <button class="btn btn-primary" onclick="adminAdd()">Add Directly</button>
+        <div id="view-request" class="view">
+            <div class="panel card" style="cursor:default;">
+                <h3 style="margin:0 0 20px 0; font-size:26px;">Share Knowledge</h3>
+                <input type="text" id="reqTitle" placeholder="Topic Title" style="width:100%; border-radius:14px; padding:16px; border:1px solid var(--border); background:var(--bg); color:var(--text); margin-bottom:12px; box-sizing:border-box; font-size:16px;">
+                <input type="text" id="reqCat" placeholder="Category" style="width:100%; border-radius:14px; padding:16px; border:1px solid var(--border); background:var(--bg); color:var(--text); margin-bottom:12px; box-sizing:border-box; font-size:16px;">
+                <textarea id="reqInfo" placeholder="Write the details here..." rows="5" style="width:100%; border-radius:14px; padding:18px; border:1px solid var(--border); background:var(--bg); color:var(--text); font-family:var(--font-main); margin-bottom:20px; box-sizing:border-box; font-size:16px;"></textarea>
+                <button class="btn btn-primary" style="width:100%;" onclick="submitRequest()">Submit Suggestion</button>
             </div>
-
-            <h4 style="margin:0 0 10px 0">Pending Requests</h4>
-            <div id="pendingList"></div>
         </div>
 
+        <div id="view-settings" class="view">
+            <div class="panel card" style="cursor:default;">
+                <h3 style="margin:0 0 24px 0; font-size:26px;">Site Settings</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px; font-family:var(--font-brand); font-weight:700; font-size:18px;">
+                    <span>Theme Mode</span>
+                    <select id="themeSelect" onchange="updateTheme()" style="width:auto; margin:0; padding:10px 15px; border-radius:12px; font-family:var(--font-brand); border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+                <span style="font-size:16px; font-family:var(--font-brand); font-weight:800;">Accent Palette</span>
+                <div class="color-grid" id="accentPicker">
+                    <div class="color-dot" style="background:#6366f1" onclick="setAccent('#6366f1')"></div>
+                    <div class="color-dot" style="background:#10b981" onclick="setAccent('#10b981')"></div>
+                    <div class="color-dot" style="background:#f43f5e" onclick="setAccent('#f43f5e')"></div>
+                    <div class="color-dot" style="background:#f59e0b" onclick="setAccent('#f59e0b')"></div>
+                    <div class="color-dot" style="background:#8b5cf6" onclick="setAccent('#8b5cf6')"></div>
+                    <div class="color-dot" style="background:#06b6d4" onclick="setAccent('#06b6d4')"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        const myManualConfig = {
-            apiKey: "AIzaSyA19d5U_di3_B2tmmDdj8wi61xO6DAlGok",
+        // Global variables for Firebase
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "", 
             authDomain: "trethsearch.firebaseapp.com",
             projectId: "trethsearch",
             storageBucket: "trethsearch.firebasestorage.app",
             messagingSenderId: "169526814734",
-            appId: "1:169526814734:web:bc376db9f61603935bf45f",
-            measurementId: "G-BCT7498TBJ"
+            appId: "1:169526814734:web:bc376db9f61603935bf45f"
         };
 
-        firebase.initializeApp(myManualConfig);
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-flow';
 
         let mainData = [];
-        let pendingData = [];
-        const ADMIN_PASS = "displayflex11!";
+        let activeIndex = 0;
 
-        // Logic to switch between UI tabs
-        function switchMode(mode) {
-            const views = ['viewSearch', 'viewRequest', 'viewAdmin'];
-            const btns = ['btnSearch', 'btnRequest', 'btnAdmin'];
-            
-            views.forEach(v => document.getElementById(v).style.display = 'none');
-            btns.forEach(b => document.getElementById(b).classList.remove('tab-active'));
-
-            if(mode === 'search') {
-                document.getElementById('viewSearch').style.display = 'block';
-                document.getElementById('btnSearch').classList.add('tab-active');
-                document.getElementById('modeDesc').innerText = "Search the Index";
-            } else if (mode === 'request') {
-                document.getElementById('viewRequest').style.display = 'block';
-                document.getElementById('btnRequest').classList.add('tab-active');
-                document.getElementById('modeDesc').innerText = "Submit a Suggestion";
-            } else if (mode === 'admin') {
-                document.getElementById('viewAdmin').style.display = 'block';
-                document.getElementById('btnAdmin').classList.add('tab-active');
-                document.getElementById('modeDesc').innerText = "Manage Requests";
-            }
+        // UI Helpers
+        function updateIndicator(index) {
+            const indicator = document.getElementById('navIndicator');
+            const tabs = document.querySelectorAll('.tab');
+            const targetTab = tabs[index];
+            if (!targetTab) return;
+            indicator.style.width = targetTab.offsetWidth + 'px';
+            indicator.style.transform = `translateX(${targetTab.offsetLeft - 6}px)`;
         }
 
-        // Search Bar Handler
-        document.getElementById('searchBar').oninput = (e) => {
-            const term = e.target.value.trim();
-            if(term === ADMIN_PASS) {
-                document.getElementById('btnAdmin').style.display = 'inline-block';
-                switchMode('admin');
-                e.target.value = ""; return;
-            }
-            renderSearch(term);
-        };
+        function hoverTab(index) { updateIndicator(index); }
+        function resetIndicator() { updateIndicator(activeIndex); }
+
+        function switchMode(mode, index) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(`view-${mode}`).classList.add('active');
+            document.getElementById(`tab-${mode}`).classList.add('active');
+            activeIndex = index;
+            updateIndicator(index);
+        }
+
+        document.getElementById('searchBar').oninput = (e) => renderSearch(e.target.value.trim());
 
         function renderSearch(term) {
             const list = document.getElementById('resultsList');
-            if(!term) { list.innerHTML = ""; return; }
+            const instant = document.getElementById('instantMatch');
+            if(!term) { list.innerHTML = ""; instant.style.display = "none"; return; }
             
             const filtered = mainData.filter(i => 
-                i.key.toLowerCase().includes(term.toLowerCase()) || 
-                i.cat.toLowerCase().includes(term.toLowerCase())
+                (i.key && i.key.toLowerCase().includes(term.toLowerCase())) || 
+                (i.cat && i.cat.toLowerCase().includes(term.toLowerCase()))
             );
 
+            const bestMatch = filtered.find(i => i.key.toLowerCase().startsWith(term.toLowerCase())) || filtered[0];
+
+            if(bestMatch && term.length >= 2) {
+                instant.style.display = "block";
+                document.getElementById('matchCat').innerText = bestMatch.cat;
+                document.getElementById('matchTitle').innerText = bestMatch.key;
+                document.getElementById('matchVal').innerText = bestMatch.val;
+            } else { instant.style.display = "none"; }
+
             list.innerHTML = filtered.map(i => `
-                <div class="result-card">
+                <div class="card" onclick="copyVal('${i.val.replace(/'/g, "\\'")}')">
                     <span class="badge">${i.cat}</span>
-                    <h3 style="margin:8px 0 4px">${i.key}</h3>
-                    <p style="margin:0; font-size:14px; color:#475569">${i.val}</p>
+                    <h3>${i.key}</h3>
+                    <p style="margin:0; font-size:16px; color:var(--muted); font-family:var(--font-main);">${i.val}</p>
                 </div>
             `).join('');
         }
 
-        // --- PUBLIC REQUEST LOGIC ---
+        function copyVal(val) {
+            const el = document.createElement('textarea');
+            el.value = val; document.body.appendChild(el); el.select();
+            document.execCommand('copy'); document.body.removeChild(el);
+        }
+
         async function submitRequest() {
             const key = document.getElementById('reqTitle').value;
             const cat = document.getElementById('reqCat').value || "General";
             const val = document.getElementById('reqInfo').value;
-            if(!key || !val) return alert("Please fill in Title and Details.");
-
+            if(!key || !val) return;
+            
             try {
-                await db.collection('requests').add({ key, cat, val, status: 'pending', ts: Date.now() });
-                alert("Request submitted! It will appear after admin approval.");
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('requests').add({ 
+                    key, cat, val, ts: firebase.firestore.FieldValue.serverTimestamp() 
+                });
                 document.getElementById('reqTitle').value = "";
                 document.getElementById('reqInfo').value = "";
-                switchMode('search');
-            } catch(e) { alert("Error: " + e.message); }
+                switchMode('search', 0);
+            } catch(e) { console.error("Submit error:", e); }
         }
 
-        // --- ADMIN ACTIONS ---
-        async function adminAdd() {
-            const key = document.getElementById('adminTitle').value;
-            const cat = document.getElementById('adminCat').value || "Admin Add";
-            const val = document.getElementById('adminInfo').value;
-            if(!key || !val) return;
-            await db.collection('notes').add({ key, cat, val, ts: Date.now() });
-            document.getElementById('adminTitle').value = "";
-            document.getElementById('adminInfo').value = "";
-            alert("Added directly to index.");
+        function updateTheme() {
+            const mode = document.getElementById('themeSelect').value;
+            document.body.className = mode === 'dark' ? 'dark-theme' : '';
+            localStorage.setItem('tf-mode', mode);
         }
 
-        async function approveRequest(id, data) {
-            try {
-                // 1. Add to main notes
-                await db.collection('notes').add({ ...data, ts: Date.now() });
-                // 2. Remove from requests
-                await db.collection('requests').doc(id).delete();
-            } catch(e) { console.error(e); }
+        function setAccent(color) {
+            document.documentElement.style.setProperty('--primary', color);
+            localStorage.setItem('tf-accent', color);
+            document.querySelectorAll('.color-dot').forEach(dot => {
+                dot.classList.toggle('selected', (dot.style.backgroundColor === color || dot.style.background.includes(color)));
+            });
         }
 
-        async function rejectRequest(id) {
-            if(confirm("Reject and delete this request?")) {
-                await db.collection('requests').doc(id).delete();
-            }
-        }
-
-        function renderPending() {
-            const list = document.getElementById('pendingList');
-            if(pendingData.length === 0) {
-                list.innerHTML = "<p style='color:#94a3b8; font-size:13px'>No pending requests.</p>";
-                return;
-            }
-            list.innerHTML = pendingData.map(i => `
-                <div class="result-card request-card" style="color:black">
-                    <span class="badge">${i.cat}</span>
-                    <h4 style="margin:5px 0">${i.key}</h4>
-                    <p style="font-size:13px; margin-bottom:10px">${i.val}</p>
-                    <button class="btn btn-approve" onclick='approveRequest("${i.id}", ${JSON.stringify(i).replace(/"/g, '&quot;')})'>Approve</button>
-                    <button class="btn btn-reject" onclick='rejectRequest("${i.id}")'>Reject</button>
-                </div>
-            `).join('');
-        }
-
-        // --- CLOUD SYNC ---
         async function init() {
+            const m = localStorage.getItem('tf-mode') || 'light';
+            const a = localStorage.getItem('tf-accent') || '#6366f1';
+            document.getElementById('themeSelect').value = m;
+            updateTheme();
+            setAccent(a);
+            setTimeout(() => updateIndicator(0), 400);
+
             try {
-                await auth.signInAnonymously();
-                document.getElementById('dot').classList.add('online');
-                document.getElementById('statusTxt').innerText = "Cloud Active";
+                // For GitHub/External sites:
+                // Ensure domain is whitelisted in Firebase Auth console
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else {
+                    await auth.signInAnonymously();
+                }
+                
+                document.getElementById('statusPill').classList.add('online');
+                document.getElementById('statusTxt').innerText = "Online";
 
-                // Listen to main notes
-                db.collection('notes').onSnapshot(snap => {
-                    mainData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Listen for data
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('main_index').onSnapshot(s => {
+                    mainData = s.docs.map(d => d.data());
+                    if(document.getElementById('searchBar').value) renderSearch(document.getElementById('searchBar').value);
+                }, err => {
+                    console.error("Connection issue:", err);
+                    document.getElementById('statusTxt').innerText = "Sync Error";
                 });
-
-                // Listen to requests
-                db.collection('requests').onSnapshot(snap => {
-                    pendingData = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-                    renderPending();
-                });
-            } catch(e) {
-                document.getElementById('statusTxt').innerText = "Auth Error";
-                console.error(e);
+            } catch(e) { 
+                console.error("Init Error:", e);
+                document.getElementById('statusTxt').innerText = "Offline";
             }
         }
 
         window.onload = init;
+        window.onresize = () => updateIndicator(activeIndex);
     </script>
 </body>
 </html>
