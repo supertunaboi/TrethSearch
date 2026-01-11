@@ -1,6 +1,6 @@
-## TrethSearch 🎓
+## TrethFlow 🎓
 
-TrethSearch is a cloud-powered study index designed to help students find information, formulas, and study notes quickly. It features a real-time search interface and a built-in request system for community contributions.
+TrethFlow is a cloud-powered study index designed to help students find information, formulas, and study notes quickly. It features a real-time, fluid. search interface and a built-in request system for community contributions.
 
 ## ✨ Features
 - **Real-time Search:** Instantly filters topics as you type.
@@ -12,12 +12,12 @@ TrethSearch is a cloud-powered study index designed to help students find inform
 ## 🚀 How to Use
 1. **Search:** Simply type a topic in the search bar.
 2. **Request:** If a topic is missing, use the suggestion box at the bottom.
-3. **Admin:** Admins can enter the secret passcode in the search bar to unlock management tools.
 
 ## 🛠️ Built With
 - HTML5 & CSS3 (Modern Responsive Design)
 - JavaScript (Vanilla JS)
 - [Firebase](https://firebase.google.com/) (Firestore & Authentication)
+- The help of Google's Gemini. Without Gemini, this wouldn't have been possible.
 
 ## 📄 License
-This project is licensed under the MIT License - see the licence for details.
+
