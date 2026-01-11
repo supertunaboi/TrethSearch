@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TrethSearch - Cloud Study Index</title>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase SDKs - Using fixed versions for maximum stability -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <style>
         :root {
             --bg: #f8fafc;
@@ -19,15 +19,20 @@
             --border: #e2e8f0;
             --admin-bg: #1e293b;
             --font-stack: system-ui, -apple-system, sans-serif;
+            --success: #10b981;
+            --error: #ef4444;
         }
 
         * { box-sizing: border-box; }
         body { font-family: var(--font-stack); background: var(--bg); color: var(--text-main); margin: 0; padding: 40px 0; }
         .container { max-width: 48rem; margin: 0 auto; padding: 0 1.5rem; }
         
-        header { margin-bottom: 2.5rem; text-align: left; }
+        header { margin-bottom: 2.5rem; text-align: left; display: flex; justify-content: space-between; align-items: flex-start; }
         h1 { font-size: 2.5rem; font-weight: 800; margin: 0; }
         .dot { color: var(--primary); }
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #cbd5e1; margin-right: 5px; }
+        .status-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .status-error { background: var(--error); box-shadow: 0 0 8px var(--error); }
 
         /* Search Interface */
         .search-container { position: relative; margin-bottom: 2rem; }
@@ -64,7 +69,7 @@
         #toast {
             position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
             background: #0f172a; color: white; padding: 0.8rem 1.5rem; border-radius: 50px;
-            opacity: 0; transition: 0.3s; pointer-events: none;
+            opacity: 0; transition: 0.3s; pointer-events: none; z-index: 1000;
         }
 
         #welcome-msg { text-align: center; color: var(--text-muted); padding: 40px; }
@@ -73,12 +78,17 @@
 <body>
     <div class="container">
         <header>
-            <h1>TrethSearch<span class="dot">.</span></h1>
-            <p style="color: var(--text-muted)">Cloud Study Index</p>
+            <div>
+                <h1>TrethSearch<span class="dot">.</span></h1>
+                <p style="color: var(--text-muted); margin: 5px 0 0 0;">Cloud Study Index</p>
+            </div>
+            <div id="cloudStatus" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 12px;">
+                <span class="status-dot" id="statusDot"></span> <span id="statusText">Cloud Connecting...</span>
+            </div>
         </header>
 
         <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search topics (e.g. Physics, Equations...)" autocomplete="off">
+            <input type="text" id="searchInput" placeholder="Search topics (e.g. Biology, Math...)" autocomplete="off">
         </div>
 
         <div id="adminPanel">
@@ -91,23 +101,25 @@
         </div>
 
         <div id="results">
-            <div id="welcome-msg">Connecting to cloud...</div>
+            <div id="welcome-msg">Ready to search.</div>
         </div>
     </div>
 
     <div id="toast">Copied to clipboard!</div>
 
     <script>
+        // Environment variables
         const firebaseConfig = JSON.parse(__firebase_config);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'treth-engine-v1';
+
+        // Initialize
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'treth-engine-v1';
 
         const ADMIN_PASS = "displayflex11!";
         let cloudData = [];
 
-        // STARTER DATA: These only show up when typing
         const starterData = [
             { key: "Photosynthesis", cat: "Biology", val: "The process by which plants use sunlight, water, and carbon dioxide to create oxygen and energy in the form of sugar." },
             { key: "Newton's First Law", cat: "Physics", val: "An object at rest stays at rest, and an object in motion stays in motion unless acted upon by an external force." },
@@ -115,6 +127,21 @@
             { key: "Water Cycle", cat: "Science", val: "The continuous movement of water within the Earth and atmosphere through evaporation, condensation, and precipitation." },
             { key: "Periodic Table", cat: "Chemistry", val: "A tabular display of the chemical elements, organized by atomic number and chemical properties." }
         ];
+
+        function setStatus(state, msg) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            dot.className = 'status-dot';
+            if(state === 'online') {
+                dot.classList.add('status-online');
+                text.innerText = "Cloud Active";
+            } else if(state === 'error') {
+                dot.classList.add('status-error');
+                text.innerText = msg || "Access Restricted";
+            } else {
+                text.innerText = "Connecting...";
+            }
+        }
 
         function showToast() {
             const t = document.getElementById('toast');
@@ -124,14 +151,15 @@
 
         function render(data, isSearching) {
             const res = document.getElementById('results');
-            
             if (!isSearching) {
                 res.innerHTML = "<div id='welcome-msg'>Start typing to search the index...</div>";
                 return;
             }
-
-            res.innerHTML = data.length ? "" : "<div style='text-align:center; padding:40px; color:gray;'>No topics found.</div>";
-            
+            if (data.length === 0) {
+                res.innerHTML = "<div style='text-align:center; padding:40px; color:gray;'>No topics found.</div>";
+                return;
+            }
+            res.innerHTML = "";
             data.forEach(item => {
                 const card = document.createElement('div');
                 card.className = 'result-card';
@@ -155,45 +183,41 @@
 
         document.getElementById('searchInput').oninput = (e) => {
             const val = e.target.value.trim();
-            
             if(val === ADMIN_PASS) {
                 document.getElementById('adminPanel').style.display = 'block';
                 e.target.value = "";
                 return;
             }
-
             if (val === "") {
                 render([], false);
                 return;
             }
-
-            // Combine cloud data and starter data for searching
             const combined = [...cloudData, ...starterData];
             const filtered = combined.filter(i => 
-                i.key.toLowerCase().includes(val.toLowerCase()) || 
-                i.cat.toLowerCase().includes(val.toLowerCase())
+                (i.key && i.key.toLowerCase().includes(val.toLowerCase())) || 
+                (i.cat && i.cat.toLowerCase().includes(val.toLowerCase()))
             );
             render(filtered, true);
         };
 
         document.getElementById('saveBtn').onclick = async () => {
-            if (!auth.currentUser) return alert("Please wait for authentication to complete.");
-            
+            if (!auth.currentUser) return alert("Reconnecting to cloud... Please try in a moment.");
             const key = document.getElementById('newKey').value.trim();
             const cat = document.getElementById('newCat').value.trim() || "General";
             const val = document.getElementById('newVal').value.trim();
-            
             if(!key || !val) return alert("Title and Info are required!");
-
+            
             try {
+                // RULE 1: Standard Path
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('main_index').add({
                     key, cat, val, timestamp: firebase.firestore.FieldValue.serverTimestamp()
                 });
                 document.getElementById('newKey').value = "";
+                document.getElementById('newCat').value = "";
                 document.getElementById('newVal').value = "";
                 alert("Saved to cloud!");
             } catch (err) {
-                alert("Error saving: " + err.message);
+                alert("Cloud Error: " + err.message);
             }
         };
 
@@ -201,47 +225,66 @@
             document.getElementById('adminPanel').style.display = 'none';
         };
 
-        const initApp = async () => {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else {
-                    await auth.signInAnonymously();
-                }
+        async function initApp() {
+            // Use exponential backoff for connection stability
+            let retryCount = 0;
+            const maxRetries = 5;
 
-                auth.onAuthStateChanged((user) => {
-                    if (user) {
-                        db.collection('artifacts').doc(appId).collection('public').doc('data').collection('main_index')
-                            .onSnapshot(snap => {
+            const connect = async () => {
+                try {
+                    // RULE 3: Auth first
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await auth.signInWithCustomToken(__initial_auth_token);
+                    } else {
+                        await auth.signInAnonymously();
+                    }
+
+                    auth.onAuthStateChanged((user) => {
+                        if (user) {
+                            // RULE 1: Path structure
+                            const collectionRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('main_index');
+                            
+                            // RULE 2: Fetch all then sort locally
+                            collectionRef.onSnapshot((snap) => {
+                                setStatus('online');
                                 cloudData = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                                cloudData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                                 
-                                // Initial state: don't show results until user types
+                                cloudData.sort((a, b) => {
+                                    const timeA = a.timestamp?.toMillis() || 0;
+                                    const timeB = b.timestamp?.toMillis() || 0;
+                                    return timeB - timeA;
+                                });
+
                                 const currentInput = document.getElementById('searchInput').value.trim();
-                                if (currentInput === "") {
-                                    render([], false);
-                                } else {
-                                    // Refresh view if they are already typing
+                                if (currentInput !== "") {
                                     const combined = [...cloudData, ...starterData];
                                     const filtered = combined.filter(i => 
-                                        i.key.toLowerCase().includes(currentInput.toLowerCase()) || 
-                                        i.cat.toLowerCase().includes(currentInput.toLowerCase())
+                                        (i.key && i.key.toLowerCase().includes(currentInput.toLowerCase())) || 
+                                        (i.cat && i.cat.toLowerCase().includes(currentInput.toLowerCase()))
                                     );
                                     render(filtered, true);
                                 }
-                            }, err => {
-                                console.error("Firestore Error:", err);
-                                document.getElementById('results').innerHTML = "Error loading cloud data.";
+                            }, (err) => {
+                                console.error("Snapshot error:", err);
+                                setStatus('error', "Sync Error");
                             });
+                        }
+                    });
+                } catch (err) {
+                    if (retryCount < maxRetries) {
+                        retryCount++;
+                        const delay = Math.pow(2, retryCount) * 500;
+                        setTimeout(connect, delay);
+                    } else {
+                        setStatus('error', "Connection Failed");
                     }
-                });
-            } catch (err) {
-                console.error("Auth Error:", err);
-                document.getElementById('results').innerHTML = "Authentication failed.";
-            }
-        };
+                }
+            };
 
-        initApp();
+            connect();
+        }
+
+        window.onload = initApp;
     </script>
 </body>
 </html>
