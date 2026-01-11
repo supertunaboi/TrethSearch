@@ -25,6 +25,7 @@
         #adminArea { display: none; background: #1e293b; color: white; padding: 20px; border-radius: 12px; margin-top: 20px; }
         .btn { background: var(--primary); color: white; border: none; padding: 12px; width: 100%; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .manual-btn { font-size: 10px; color: var(--primary); background: none; border: 1px solid var(--primary); padding: 2px 5px; border-radius: 4px; cursor: pointer; margin-top: 5px; }
+        .error-hint { font-size: 11px; color: var(--error); display: none; margin-top: 4px; max-width: 220px; line-height: 1.3; text-align: right; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -37,7 +38,8 @@
             <div class="status-box">
                 <div id="dot" class="status-dot"></div>
                 <div id="statusTxt" style="font-size:12px; color:#64748b">Waking Cloud...</div>
-                <button id="retryBtn" class="manual-btn" style="display:none" onclick="startCloud()">Manual Connect</button>
+                <div id="errorHint" class="error-hint"></div>
+                <button id="retryBtn" class="manual-btn" style="display:none" onclick="startCloud()">Retry Connection</button>
             </div>
         </header>
 
@@ -55,22 +57,29 @@
     </div>
 
     <script>
-        // Use a safe wrapper to parse config
-        let firebaseConfig = {};
+        // Your Firebase Configuration
+        const myManualConfig = {
+            apiKey: "AIzaSyA19d5U_di3_B2tmmDdj8wi61xO6DAlGok",
+            authDomain: "trethsearch.firebaseapp.com",
+            projectId: "trethsearch",
+            storageBucket: "trethsearch.firebasestorage.app",
+            messagingSenderId: "169526814734",
+            appId: "1:169526814734:web:bc376db9f61603935bf45f",
+            measurementId: "G-BCT7498TBJ"
+        };
+
+        // Initialize Firebase safely
+        let db, auth;
         try {
-            firebaseConfig = JSON.parse(__firebase_config);
-        } catch(e) {
-            console.error("Config parse error");
+            if (!firebase.apps.length) {
+                firebase.initializeApp(myManualConfig);
+            }
+            db = firebase.firestore();
+            auth = firebase.auth();
+        } catch (e) {
+            console.error("Firebase Init Error:", e.message);
+            window.firebaseError = e.message;
         }
-        
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'treth-v1';
-        
-        // Initialize Firebase
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
-        const auth = firebase.auth();
 
         let cloudItems = [];
         const localItems = [
@@ -78,10 +87,11 @@
             {key: "Gravity", cat: "Physics", val: "9.8 m/s² attraction force."}
         ];
 
-        function setVisuals(mode, label) {
+        function setVisuals(mode, label, hint = "") {
             const d = document.getElementById('dot');
             const t = document.getElementById('statusTxt');
             const r = document.getElementById('retryBtn');
+            const h = document.getElementById('errorHint');
             
             d.className = 'status-dot';
             if (mode === 'on') d.classList.add('online');
@@ -90,36 +100,57 @@
             
             t.innerText = label;
             r.style.display = (mode === 'off') ? 'inline-block' : 'none';
-        }
-
-        async function startCloud() {
-            setVisuals('wait', 'Handshaking...');
-            try {
-                // Ensure auth first
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else {
-                    await auth.signInAnonymously();
-                }
-
-                // Listen for Data
-                const path = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notes');
-                
-                path.onSnapshot((query) => {
-                    cloudItems = query.docs.map(doc => doc.data());
-                    setVisuals('on', 'Cloud Active');
-                }, (err) => {
-                    console.error("Cloud Error:", err);
-                    setVisuals('off', 'Cloud Locked');
-                });
-
-            } catch (err) {
-                console.error("Auth Error:", err);
-                setVisuals('off', 'Connection Failed');
+            if (hint) {
+                h.innerText = hint;
+                h.style.display = 'block';
+            } else {
+                h.style.display = 'none';
             }
         }
 
-        // Search logic
+        let unsubscribe = null;
+
+        async function startCloud() {
+            if (window.firebaseError) {
+                setVisuals('off', 'Config Error', "Please check your Firebase keys.");
+                return;
+            }
+
+            if (unsubscribe) unsubscribe(); // Cleanup old listener if retrying
+
+            setVisuals('wait', 'Connecting...');
+            try {
+                // Sign in anonymously
+                await auth.signInAnonymously();
+
+                const notesRef = db.collection('notes');
+                
+                unsubscribe = notesRef.onSnapshot((query) => {
+                    cloudItems = query.docs.map(doc => doc.data());
+                    setVisuals('on', 'Cloud Active');
+                }, (err) => {
+                    console.error("Firestore Error Detail:", err);
+                    const msg = err.message || "";
+                    if (msg.includes("permission-denied") || err.code === "permission-denied") {
+                        setVisuals('off', 'Permission Error', "Go to Firestore > Rules tab and change 'allow read, write: if false;' to 'true', then Publish.");
+                    } else if (msg.includes("not-found")) {
+                        setVisuals('off', 'No Database', "Go to Firestore in Firebase Console and click 'Create Database'. Choose Standard Mode.");
+                    } else {
+                        setVisuals('off', 'Offline Mode', "Retrying connection...");
+                        setTimeout(startCloud, 5000); // Auto-retry for network blips
+                    }
+                });
+
+            } catch (err) {
+                console.error("Auth Error Detail:", err);
+                if (err.code === 'auth/configuration-not-found') {
+                    setVisuals('off', 'Enable Anon Login', "Go to Auth > Sign-in method and enable Anonymous.");
+                } else {
+                    setVisuals('off', 'Auth Failed', err.message);
+                }
+            }
+        }
+
         document.getElementById('searchBar').oninput = (e) => {
             const term = e.target.value;
             if(term === "displayflex11!") {
@@ -149,32 +180,24 @@
             const key = document.getElementById('addTitle').value;
             const cat = document.getElementById('addCat').value;
             const val = document.getElementById('addInfo').value;
-            if(!key || !val) return alert("Missing info!");
+            if(!key || !val) return;
 
             try {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('notes').add({
+                await db.collection('notes').add({
                     key, cat, val, created: Date.now()
                 });
-                alert("Cloud Updated!");
                 document.getElementById('addTitle').value = "";
                 document.getElementById('addInfo').value = "";
+                document.getElementById('addCat').value = "";
+                alert("Saved to Cloud!");
             } catch(e) {
-                alert("Upload failed: " + e.message);
+                console.error("Upload Error:", e.message);
+                alert("Save failed. Check if 'Rules' are set to true in Firebase.");
             }
         }
 
-        // Run on load
         window.onload = () => {
-            // Short delay to ensure browser environment is stable
-            setTimeout(startCloud, 500);
-            
-            // Timeout Check
-            setTimeout(() => {
-                const status = document.getElementById('statusTxt').innerText;
-                if(status === 'Waking Cloud...' || status === 'Handshaking...') {
-                    setVisuals('off', 'Timed Out');
-                }
-            }, 8000);
+            setTimeout(startCloud, 1000);
         };
     </script>
 </body>
